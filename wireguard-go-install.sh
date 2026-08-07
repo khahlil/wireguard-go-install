@@ -289,11 +289,11 @@ function revokeClient() {
 		exit 0
 	fi
 
-	grep -n '^# Client:' /etc/wireguard/${SERVER_WG_NIC}.conf | cut -d: -f1,3
+    grep -n '^# Client:' /etc/wireguard/${SERVER_WG_NIC}.conf | cut -d: -f1,3
 	read -rp "Enter client name to revoke: " REMOVE_CLIENT_NAME
 
 	if [ -n "$REMOVE_CLIENT_NAME" ]; then
-		sed -i "/# Client: ${REMOVE_CLIENT_NAME}/,+4d" /etc/wireguard/${SERVER_WG_NIC}.conf
+		sed -i "/^\[Peer\]$/{N;/# Client: ${REMOVE_CLIENT_NAME}\$/!b; :a; N; /AllowedIPs/!ba; d}" /etc/wireguard/${SERVER_WG_NIC}.conf
 		wg syncconf ${SERVER_WG_NIC} <(wg-quick strip ${SERVER_WG_NIC})
 		echo "Client ${REMOVE_CLIENT_NAME} removed successfully."
 	fi
