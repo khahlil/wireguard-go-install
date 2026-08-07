@@ -111,8 +111,8 @@ function installQuestions() {
 	echo "   4) AdGuard DNS (94.140.14.14, 94.140.15.15)"
 	echo "   5) OpenDNS (208.67.222.222, 208.67.220.220)"
 	echo "   6) NextDNS (45.90.28.0, 45.90.30.0)"
-	echo "   7) NextDNS Custom (Profile ID)"
-	read -rp "DNS choice [1-8]: " -e -i "1" DNS_CHOICE
+	echo "   7) Add Custom IPv4 DNS"
+	read -rp "DNS choice [1-7]: " -e -i "1" DNS_CHOICE
 
 	case "$DNS_CHOICE" in
 		1) CLIENT_DNS="1.1.1.1, 1.0.0.1" ;;
@@ -122,12 +122,9 @@ function installQuestions() {
         5) CLIENT_DNS="208.67.222.222, 208.67.220.220" ;;
 		6) CLIENT_DNS="45.90.28.0, 45.90.30.0" ;;
 		7) 
-			read -rp "Enter your NextDNS Profile ID (e.g., abc123): " NEXTDNS_ID
-			if [[ -n "$NEXTDNS_ID" ]]; then
-				CLIENT_DNS="45.90.28.0#${NEXTDNS_ID}.dns.nextdns.io, 45.90.30.0#${NEXTDNS_ID}.dns.nextdns.io"
-			else
-				CLIENT_DNS="45.90.28.0, 45.90.30.0"
-			fi
+			read -rp "Primary IPv4 DNS: " CUSTOM_DNS1
+			read -rp "Secondary IPv4 DNS: " CUSTOM_DNS2
+			CLIENT_DNS="${CUSTOM_DNS1}, ${CUSTOM_DNS2}"
 			;;
 		*) CLIENT_DNS="1.1.1.1, 1.0.0.1" ;;
 	esac
