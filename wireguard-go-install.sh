@@ -193,6 +193,7 @@ PrivateKey = ${SERVER_PRIV_KEY}
 ListenPort = ${SERVER_PORT}
 PostUp = iptables -A INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT; iptables -A FORWARD -i ${SERVER_WG_NIC} -j ACCEPT; iptables -t nat -A POSTROUTING -o ${SERVER_NIC} -j MASQUERADE${ISOLATION_POSTUP}
 PostDown = iptables -D INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT; iptables -D FORWARD -i ${SERVER_WG_NIC} -j ACCEPT; iptables -t nat -D POSTROUTING -o ${SERVER_NIC} -j MASQUERADE${ISOLATION_POSTDOWN}
+# Default DNS Settings for Clients: ${CLIENT_DNS}
 EOF
 
 	chmod 600 /etc/wireguard/${SERVER_WG_NIC}.conf
