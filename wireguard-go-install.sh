@@ -3,9 +3,14 @@
 # Secure WireGuard server installer
 # Using wireguard-go from Debian 12 official repositories & support OpenVZ/venet0.
 
+# Color Definitions
 RED='\033[0;31m'
-ORANGE='\033[0;33m'
 GREEN='\033[0;32m'
+ORANGE='\033[0;33m'
+YELLOW='\033[1;33m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
 NC='\033[0m'
 
 function isRoot() {
@@ -48,39 +53,42 @@ function initialCheck() {
 }
 
 function installQuestions() {
-	echo "Welcome to the WireGuard (wireguard-go) installer for Debian 12!"
-	echo ""
-	echo "Answer the following questions to set up your configuration."
-	echo ""
+	# Clear screen untuk tampilan bersih (opsional)
+	clear
 
-	# 1. Detect Main Interface (Supports venet0 / OpenVZ)
+	# Sleek Minimalist Header
+	echo -e "${CYAN}=====================================================${NC}"
+	echo -e "   ${BOLD}${GREEN}WireGuard Installer${NC} ${CYAN}(wireguard-go)${NC} - ${BOLD}Debian 12${NC}"
+	echo -e "${CYAN}=====================================================${NC}"
+	echo -e "${ORANGE}Answer the following questions to set up your server.${NC}\n"
+
+	# 1. Detect Main Interface
 	SERVER_NIC=$(ip route show default | grep -oP 'dev \K\S+' | head -n1)
 	if [[ "$SERVER_NIC" == "link" ]] || [[ -z "$SERVER_NIC" ]]; then
 		if ip link show venet0 &>/dev/null; then
 			SERVER_NIC="venet0"
 		fi
 	fi
-
-	# 2. Detect Public IP (Ignore 127.*)
-	SERVER_PUB_IP=$(ip -4 addr show "$SERVER_NIC" 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '^127\.' | head -n1)
 	
-	# Fallback to external API if local IP is empty or loopback
+	# 2. Detect Public IP
+	SERVER_PUB_IP=$(ip -4 addr show "$SERVER_NIC" 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '^127\.' | head -n1)
 	if [[ -z "$SERVER_PUB_IP" ]]; then
 		SERVER_PUB_IP=$(curl -s4 --connect-timeout 5 https://ifconfig.me || curl -s4 --connect-timeout 5 https://api.ipify.org)
 	fi
 
-	read -rp "Server IPv4 Public IP: " -e -i "$SERVER_PUB_IP" SERVER_PUB_IP
-	read -rp "Main network interface: " -e -i "$SERVER_NIC" SERVER_NIC
-	read -rp "WireGuard interface name: " -e -i "wg0" SERVER_WG_NIC
-	read -rp "WireGuard Server IPv4: " -e -i "10.66.66.1" SERVER_WG_IPV4
+	# Network Settings Prompts
+	echo -e "${BOLD}${YELLOW}[ Network Configuration ]${NC}"
+	read -rp "$(echo -e "${CYAN}•${NC} Server Public IPv4   : ")" -e -i "$SERVER_PUB_IP" SERVER_PUB_IP
+	read -rp "$(echo -e "${CYAN}•${NC} Network Interface    : ")" -e -i "$SERVER_NIC" SERVER_NIC
+	read -rp "$(echo -e "${CYAN}•${NC} WireGuard Interface  : ")" -e -i "wg0" SERVER_WG_NIC
+	read -rp "$(echo -e "${CYAN}•${NC} WireGuard Server IP  : ")" -e -i "10.66.66.1" SERVER_WG_IPV4
 
-	# Port Selection Options
-	echo ""
-	echo "Select WireGuard Port:"
-	echo "   1) Default Port (51820)"
-	echo "   2) Random Port (Randomized between 1024-65535)"
-	echo "   3) Custom Port (Manual input)"
-	read -rp "Port choice [1-3]: " -e -i "1" PORT_CHOICE
+	# Port Selection
+	echo -e "\n${BOLD}${YELLOW}[ Port Selection ]${NC}"
+	echo -e "  ${GREEN}1)${NC} Default Port  ${CYAN}(51820)${NC}"
+	echo -e "  ${GREEN}2)${NC} Random Port   ${CYAN}(1024-65535)${NC}"
+	echo -e "  ${GREEN}3)${NC} Custom Port   ${CYAN}(Manual Input)${NC}"
+	read -rp "$(echo -e "${CYAN}Select option [1-3]: ${NC}")" -e -i "1" PORT_CHOICE
 
 	case "$PORT_CHOICE" in
 		1)
@@ -92,10 +100,10 @@ function installQuestions() {
 				RANDOM_PORT=$(shuf -i 1024-65535 -n 1)
 			done
 			SERVER_PORT="$RANDOM_PORT"
-			echo -e "Random port selected: \033[0;32m${SERVER_PORT}\033[0m"
+			echo -e "  ${GREEN}✓${NC} Selected Random Port: ${BOLD}${GREEN}${SERVER_PORT}${NC}"
 			;;
 		3)
-			read -rp "Enter Port number [1024-65535]: " -e -i "51820" SERVER_PORT
+			read -rp "$(echo -e "  ${CYAN}• Enter Port [1024-65535]: ${NC}")" -e SERVER_PORT
 			;;
 		*)
 			SERVER_PORT="51820"
@@ -103,35 +111,56 @@ function installQuestions() {
 	esac
 
 	# DNS Options
-	echo ""
-	echo "Select Client DNS Resolver:"
-	echo "   1) Cloudflare (1.1.1.1, 1.0.0.1)"
-	echo "   2) Google (8.8.8.8, 8.8.4.4)"
-	echo "   3) Quad9 (9.9.9.9, 149.112.112.112)"
-	echo "   4) AdGuard DNS (94.140.14.14, 94.140.15.15)"
-	echo "   5) OpenDNS (208.67.222.222, 208.67.220.220)"
-	echo "   6) NextDNS (45.90.28.0, 45.90.30.0)"
-	echo "   7) Add Custom IPv4 DNS"
-	read -rp "DNS choice [1-7]: " -e -i "1" DNS_CHOICE
+	echo -e "\n${BOLD}${YELLOW}[ Client DNS Resolver ]${NC}"
+	echo -e "  ${GREEN}1)${NC} Cloudflare ${CYAN}(1.1.1.1)${NC}"
+	echo -e "  ${GREEN}2)${NC} Google     ${CYAN}(8.8.8.8)${NC}"
+	echo -e "  ${GREEN}3)${NC} Quad9      ${CYAN}(9.9.9.9)${NC}"
+	echo -e "  ${GREEN}4)${NC} AdGuard    ${CYAN}(94.140.14.14)${NC}"
+	echo -e "  ${GREEN}5)${NC} OpenDNS    ${CYAN}(208.67.222.222)${NC}"
+	echo -e "  ${GREEN}6)${NC} NextDNS    ${CYAN}(45.90.28.0)${NC}"
+	echo -e "  ${GREEN}7)${NC} Custom IPv4 DNS"
+	read -rp "$(echo -e "${CYAN}Select option [1-7]: ${NC}")" -e -i "1" DNS_CHOICE
 
 	case "$DNS_CHOICE" in
 		1) CLIENT_DNS="1.1.1.1, 1.0.0.1" ;;
 		2) CLIENT_DNS="8.8.8.8, 8.8.4.4" ;;
 		3) CLIENT_DNS="9.9.9.9, 149.112.112.112" ;;
 		4) CLIENT_DNS="94.140.14.14, 94.140.15.15" ;;
-        5) CLIENT_DNS="208.67.222.222, 208.67.220.220" ;;
+		5) CLIENT_DNS="208.67.222.222, 208.67.220.220" ;;
 		6) CLIENT_DNS="45.90.28.0, 45.90.30.0" ;;
 		7) 
-			read -rp "Primary IPv4 DNS: " CUSTOM_DNS1
-			read -rp "Secondary IPv4 DNS: " CUSTOM_DNS2
+			read -rp "$(echo -e "  ${CYAN}• Primary DNS: ${NC}")" CUSTOM_DNS1
+			read -rp "$(echo -e "  ${CYAN}• Secondary DNS: ${NC}")" CUSTOM_DNS2
 			CLIENT_DNS="${CUSTOM_DNS1}, ${CUSTOM_DNS2}"
 			;;
 		*) CLIENT_DNS="1.1.1.1, 1.0.0.1" ;;
 	esac
 
-	echo ""
-	echo "Configuration ready to apply."
-	read -n1 -r -p "Press any key to continue..."
+	# Client Isolation
+	echo -e "\n${BOLD}${YELLOW}[ Client Isolation Settings ]${NC}"
+	echo -e "  ${GREEN}1)${NC} Enabled  - Keeps clients separated for security ${GREEN}(Default)${NC}"
+	echo -e "  ${GREEN}2)${NC} Disabled - Allows clients to communicate (SMB/Samba)"
+	read -rp "$(echo -e "${CYAN}Select option [1-2]: ${NC}")" -e -i "1" CLIENT_ISOLATION
+	until [[ "$CLIENT_ISOLATION" =~ ^[1-2]$ ]]; do
+		echo -e "  ${RED}Invalid option!${NC}"
+		read -rp "$(echo -e "${CYAN}Select option [1-2]: ${NC}")" -e -i "1" CLIENT_ISOLATION
+	done
+
+	case "$CLIENT_ISOLATION" in
+		1)
+			ISOLATION_POSTUP="; iptables -I FORWARD -i ${SERVER_WG_NIC} -o ${SERVER_WG_NIC} -j DROP"
+			ISOLATION_POSTDOWN="; iptables -D FORWARD -i ${SERVER_WG_NIC} -o ${SERVER_WG_NIC} -j DROP"
+			;;
+		2)
+			ISOLATION_POSTUP=""
+			ISOLATION_POSTDOWN=""
+			;;
+	esac
+
+	echo -e "\n${CYAN}-----------------------------------------------------${NC}"
+	echo -e " ${BOLD}${GREEN}✔ Configuration ready to apply!${NC}"
+	echo -e "${CYAN}-----------------------------------------------------${NC}\n"
+	read -n1 -r -p "Press any key to continue installation..."
 }
 
 function installWireGuard() {
@@ -155,17 +184,15 @@ function installWireGuard() {
 	fi
 
 	echo -e "\n${GREEN}[4/5] Writing configuration to /etc/wireguard/${SERVER_WG_NIC}.conf...${NC}"
-	
+
+	# Write configuration to wg0.conf
 	cat <<EOF > /etc/wireguard/${SERVER_WG_NIC}.conf
 [Interface]
 Address = ${SERVER_WG_IPV4}/24
 PrivateKey = ${SERVER_PRIV_KEY}
 ListenPort = ${SERVER_PORT}
-
-PostUp = iptables -A INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT; iptables -A FORWARD -i ${SERVER_WG_NIC} -j ACCEPT; iptables -t nat -A POSTROUTING -o ${SERVER_NIC} -j MASQUERADE; iptables -I FORWARD -i ${SERVER_WG_NIC} -o ${SERVER_WG_NIC} -j DROP
-PostDown = iptables -D INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT; iptables -D FORWARD -i ${SERVER_WG_NIC} -j ACCEPT; iptables -t nat -D POSTROUTING -o ${SERVER_NIC} -j MASQUERADE; iptables -D FORWARD -i ${SERVER_WG_NIC} -o ${SERVER_WG_NIC} -j DROP
-
-# Default DNS Settings for Clients: ${CLIENT_DNS}
+PostUp = iptables -A INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT; iptables -A FORWARD -i ${SERVER_WG_NIC} -j ACCEPT; iptables -t nat -A POSTROUTING -o ${SERVER_NIC} -j MASQUERADE${ISOLATION_POSTUP}
+PostDown = iptables -D INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT; iptables -D FORWARD -i ${SERVER_WG_NIC} -j ACCEPT; iptables -t nat -D POSTROUTING -o ${SERVER_NIC} -j MASQUERADE${ISOLATION_POSTDOWN}
 EOF
 
 	chmod 600 /etc/wireguard/${SERVER_WG_NIC}.conf
@@ -175,8 +202,6 @@ EOF
 	sysctl -w net.ipv4.ip_forward=1 >/dev/null 2>&1
 	sysctl -p /etc/sysctl.d/99-wireguard.conf >/dev/null 2>&1
 
-	# Open UDP port in iptables
-	iptables -A INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT
 	if command -v netfilter-persistent &>/dev/null; then
 		netfilter-persistent save >/dev/null 2>&1
 	fi
@@ -191,7 +216,8 @@ EOF
 }
 
 function newClient() {
-	echo -e "\n--- Add New WireGuard Client ---"
+	echo -e "\n${GREEN}--- Add New WireGuard Client ---${NC}"
+    echo ""
 	read -rp "Client name (e.g., android-phone): " CLIENT_NAME
 	CLIENT_NAME=$(echo "$CLIENT_NAME" | sed 's/[^a-zA-Z0-9_-]//g')
 
@@ -272,43 +298,103 @@ EOF
 	chmod 600 "$CLIENT_FILE"
 
 	echo -e "\n${GREEN}Client '${CLIENT_NAME}' created successfully!${NC}"
-	echo -e "Profile file saved to: ${GREEN}${CLIENT_FILE}${NC}\n"
+	echo -e "\nProfile file saved to: ${GREEN}${CLIENT_FILE}${NC}\n"
 	
 	# Render QR Code
 	qrencode -t ansiutf8 < "$CLIENT_FILE"
+    echo ""
 }
 
 function revokeClient() {
-	echo -e "\n--- Remove WireGuard Client ---"
-	NUMBER_OF_CLIENTS=$(grep -c '^# Client:' /etc/wireguard/${SERVER_WG_NIC}.conf)
+	echo -e "\n${GREEN}--- Remove WireGuard Client ---${NC}"
+	echo ""
+
+	# Simpan daftar nama klien ke dalam array
+	CLIENT_LIST=($(grep '^# Client:' /etc/wireguard/${SERVER_WG_NIC}.conf | awk '{print $3}'))
+	NUMBER_OF_CLIENTS=${#CLIENT_LIST[@]}
+
 	if [ "$NUMBER_OF_CLIENTS" -eq 0 ]; then
 		echo "No client configurations found."
 		exit 0
 	fi
 
-    grep -n '^# Client:' /etc/wireguard/${SERVER_WG_NIC}.conf | cut -d: -f1,3
-	read -rp "Enter client name to revoke: " REMOVE_CLIENT_NAME
+	# Tampilkan daftar klien dengan nomor urut 1, 2, 3...
+	for ((i=0; i<NUMBER_OF_CLIENTS; i++)); do
+		echo "  $((i+1))) ${CLIENT_LIST[$i]}"
+	done
+	echo ""
 
-	if [ -n "$REMOVE_CLIENT_NAME" ]; then
-		sed -i "/^\[Peer\]$/{N;/# Client: ${REMOVE_CLIENT_NAME}\$/!b; :a; N; /AllowedIPs/!ba; d}" /etc/wireguard/${SERVER_WG_NIC}.conf
-		wg syncconf ${SERVER_WG_NIC} <(wg-quick strip ${SERVER_WG_NIC})
-		echo "Client ${REMOVE_CLIENT_NAME} removed successfully."
-	fi
+	# Input nomor klien
+	read -rp "Select client number to revoke [1-${NUMBER_OF_CLIENTS}]: " CLIENT_NUMBER
+	until [[ "$CLIENT_NUMBER" =~ ^[0-9]+$ ]] && [ "$CLIENT_NUMBER" -ge 1 ] && [ "$CLIENT_NUMBER" -le "$NUMBER_OF_CLIENTS" ]; do
+		echo "$CLIENT_NUMBER: invalid selection"
+		read -rp "Select client number to revoke [1-${NUMBER_OF_CLIENTS}]: " CLIENT_NUMBER
+	done
+
+	# Ambil nama klien berdasarkan indeks array (dikurangi 1)
+	REMOVE_CLIENT_NAME="${CLIENT_LIST[$((CLIENT_NUMBER-1))]}"
+
+	# Hapus blok [Peer] dari file wg0.conf
+	sed -i "/^\[Peer\]$/{N;/# Client: ${REMOVE_CLIENT_NAME}\$/!b; :a; N; /AllowedIPs/!ba; d}" /etc/wireguard/${SERVER_WG_NIC}.conf
+
+	# Sync konfigurasi live WireGuard
+	wg syncconf ${SERVER_WG_NIC} <(wg-quick strip ${SERVER_WG_NIC})
+
+	# Hapus file konfigurasi .conf klien dari /root/ jika ada
+	rm -f /root/${SERVER_WG_NIC}-client-${REMOVE_CLIENT_NAME}.conf
+
+	echo -e "\n${GREEN}Client '${REMOVE_CLIENT_NAME}' removed successfully!${NC}"
+    echo ""
 }
 
 function uninstallWireGuard() {
 	echo -e "\n${RED}Uninstalling WireGuard and resetting system settings...${NC}"
 
+	# 1. Pastikan SERVER_WG_NIC terdefinisi
+	if [ -z "$SERVER_WG_NIC" ]; then
+		SERVER_WG_NIC="wg0"
+	fi
+
+	# 2. Ambil Port dan Interface dari file konfigurasi SEBELUM dihapus
+	CONF_FILE="/etc/wireguard/${SERVER_WG_NIC}.conf"
+	if [ -f "$CONF_FILE" ]; then
+		SERVER_PORT=$(grep -i '^ListenPort' "$CONF_FILE" | awk '{print $3}')
+	fi
+
+	# Stop service agar PostDown dieksekusi secara native oleh WireGuard
 	systemctl stop wg-quick@${SERVER_WG_NIC} 2>/dev/null
 	systemctl disable wg-quick@${SERVER_WG_NIC} 2>/dev/null
 
 	echo -e "${GREEN}[1/4] Resetting iptables rules...${NC}"
-	iptables -D INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT 2>/dev/null
-	iptables -D FORWARD -i ${SERVER_WG_NIC} -j ACCEPT 2>/dev/null
-	iptables -t nat -D POSTROUTING -o ${SERVER_NIC} -j MASQUERADE 2>/dev/null
+	
+	# Fallback: Jika SERVER_PORT terdeteksi, sapu bersih rule di iptables
+	if [ -n "$SERVER_PORT" ]; then
+		while iptables -C INPUT -p udp --dport "$SERVER_PORT" -j ACCEPT 2>/dev/null; do
+			iptables -D INPUT -p udp --dport "$SERVER_PORT" -j ACCEPT
+		done
+	fi
 
+	# Sapu bersih rule default WireGuard (51820) jika ada sisa instalasi lama
+	while iptables -C INPUT -p udp --dport 51820 -j ACCEPT 2>/dev/null; do
+		iptables -D INPUT -p udp --dport 51820 -j ACCEPT
+	done
+
+	# Bersihkan rule FORWARD dan NAT
+	while iptables -C FORWARD -i "${SERVER_WG_NIC}" -j ACCEPT 2>/dev/null; do
+		iptables -D FORWARD -i "${SERVER_WG_NIC}" -j ACCEPT
+	done
+	while iptables -C FORWARD -i "${SERVER_WG_NIC}" -o "${SERVER_WG_NIC}" -j DROP 2>/dev/null; do
+		iptables -D FORWARD -i "${SERVER_WG_NIC}" -o "${SERVER_WG_NIC}" -j DROP
+	done
+	if [ -n "$SERVER_NIC" ]; then
+		while iptables -t nat -C POSTROUTING -o "${SERVER_NIC}" -j MASQUERADE 2>/dev/null; do
+			iptables -t nat -D POSTROUTING -o "${SERVER_NIC}" -j MASQUERADE
+		done
+	fi
+
+	# Simpan perubahan iptables
 	if command -v netfilter-persistent &>/dev/null; then
-		netfilter-persistent save
+		netfilter-persistent save >/dev/null 2>&1
 	fi
 
 	echo -e "${GREEN}[2/4] Resetting sysctl configuration...${NC}"
@@ -316,8 +402,8 @@ function uninstallWireGuard() {
 		rm -f /etc/sysctl.d/99-wireguard.conf
 	fi
 
-	sysctl -w net.ipv4.ip_forward=0
-	sysctl --system
+	sysctl -w net.ipv4.ip_forward=0 >/dev/null 2>&1
+	sysctl --system >/dev/null 2>&1
 
 	echo -e "${GREEN}[3/4] Removing WireGuard packages...${NC}"
 	apt-get remove --purge -y wireguard-go wireguard-tools
@@ -326,7 +412,8 @@ function uninstallWireGuard() {
 	rm -rf /etc/wireguard
 	rm -f /root/${SERVER_WG_NIC}-client-*.conf
 
-	echo -e "\n${GREEN}WireGuard has been uninstalled, and system configurations have been restored to default!${NC}"
+	echo -e "\n${GREEN}WireGuard has been uninstalled!${NC}"
+    echo ""
 }
 
 # Main Execution Flow
@@ -334,11 +421,13 @@ initialCheck
 
 if [ -f "/etc/wireguard/wg0.conf" ]; then
 	SERVER_WG_NIC="wg0"
-	echo "WireGuard is already installed on this system."
+	echo -e "\n${GREEN}WireGuard is already installed on this system.${NC}"
+    echo ""
 	echo "1) Add New Client"
 	echo "2) Revoke Existing Client"
 	echo "3) Uninstall WireGuard"
 	echo "4) Exit"
+    echo ""
 	read -rp "Select option [1-4]: " MENU_OPTION
 	case "$MENU_OPTION" in
 		1) newClient ;;
